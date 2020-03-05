@@ -81,9 +81,7 @@ supports by default 8, therefore I see 8 hellos. Remember you can change that
 default by setting the enviornment variable `OMP_NUM_THREADS`
 (e.g., `export OMP_NUM_THREADS=4`)_
 
-## Basic Syntax
-
-### Anatomy of an `omp` pragma
+## Anatomy of an `omp` pragma
 
 Now that we have seen an example let's disect the basic syntax.
 
@@ -103,7 +101,7 @@ But more details on this later. The important idea here is to understand the
 components of an `omp` pragma rather than the syntax as other examples will
 be provided later.
 
-### The parallel region
+## The parallel region
 
 - A parallel regions begins with `#pragma omp parallel`.
 - At the start of the parallel region the threads are forked.
@@ -148,7 +146,7 @@ Parallel Code
 Serial Code After
 ```
 
-### Work Sharing
+## Work Sharing
 
 After the `fork` and `join` model the next most significant concept to
 understand is `work sharing`. Without worksharing we cannot
@@ -167,13 +165,13 @@ All worksharing constructs in `omp` are:
 1. intended to prevent `replicated work`, and
 2. have an implied barrier at the end of their scope.
 
-#### Parallel For
+### Parallel For
 
 One of the most common `work sharing` constructs is `parallel for` which
 allows for-loops to run in parallel (more details on this to follow). For
 now lets consider a simple `for` loop which can be parallelized.
 
-> evens.cpp
+> for.cpp
 
 ```cpp
 #include "omp.h"                // Include openmp header.
@@ -207,7 +205,7 @@ delete evens;                   // Clean up array.
 _Note: When using `parallel for` you cannot use `break` statements
 (compiler error), but you can use `continue` to achieve similar results._
 
-#### Single
+### Single
 
 The next most widely used `worksharing` construct is `single`. As the name
 implies, code within a `single` worksharing region is only executed by one and
@@ -248,7 +246,7 @@ environment variable `OMP_NUM_THREADS`), re-running `a.out` can return any value
 between 0 and N-1. But it will only ever return a single value per run because
 of our use of the `single` construct.
 
-### Work Schedule
+## Work Schedule
 
 In the previous examples we were performing parallel work, but we did not
 concern ourselves with how the work was divided between threads. In this
@@ -340,3 +338,101 @@ Elapsed Time Static 0.398055 sec.
 Elapsed Time Dynamic 0.0430165 sec.
 Elapsed Time Guided 0.0428927 sec.
 ```
+
+## Private vs Shared Memory
+
+One of the unique charachteristics of `OpenMP` is the ability for different
+threads to share access to the same memory. However, this opportunity also comes
+with the risk that two (or more) threads may try to write to the same location
+in memory at the same time, this is called a `race condition`.
+
+A `race condition` occurs when two (or more) threads attempt to utilize the
+same resource. The resource is canonically thought of as a location in memory,
+but it does not have to be, it could for example be an iostream. We saw this
+already in the example `parallelregion.cpp`, although we did not make a note of
+it.
+
+Race conditions are problematic for several reasons which include:
+
+1. Variables can become out of sync among the threads leading to inconsistent
+state and incorrect results.
+2. TODO (jpv): Are there other reasons to avoid a race condition.
+
+Below is an example of code __with__ a race conditions.
+
+> raceconditon.cpp
+
+```cpp
+#include "iostream"
+#include "omp.h"
+
+int main(){
+
+const int n=10;
+auto a = new int[n];        // Create an integer array  
+
+a[0] = 2;                   // Initialize the first value
+#pragma omp parallel for    // Begin parallel region and work sharing
+for (int i=1; i<n; i++){    // Loop across array
+  a[i] = a[i-1]*2;          // Race Condition!
+}
+
+for (int i=0; i<n; i++){    // Loop across array
+  std::cout<<a[i]<<", ";    // Print each value
+}
+std::cout<<std::endl;
+
+delete[] a;                 // Clean up dynamic array
+}
+```
+
+This code has undefined behavior when run in parallel. When I run this code
+with `OMP_NUM_THREADS=2` I got.
+
+> ./race.out
+
+```bash
+2, 4, 8, 16, 32, 64, 0, 0, 0, 0,
+```
+
+But when I set `OMP_NUM_THREADS=1` (forcing the code in serial), I get
+the correct result.
+
+> ./race.out
+
+```bash
+2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+```
+
+This inconsistency between the serial and parallel versions of the code is
+undesirable. The __corrected__ code that does __not__ have a race condition is
+shown below.
+
+> noracecondition.cpp
+
+```cpp
+#include "iostream"
+#include "omp.h"
+#include "cmath"
+
+int main(){
+
+const int n=10;
+auto a = new int[n];        // Create an integer array  
+
+#pragma omp parallel for    // Begin parallel region and work sharing
+for (int i=0; i<n; i++){    // Loop across array
+  a[i] = std::pow(2, i)*2;  // Remove Race Condition!
+}
+
+for (int i=0; i<n; i++){    // Loop across array
+  std::cout<<a[i]<<", ";    // Print each value
+}
+std::cout<<std::endl;
+
+delete[] a;                 // Clean up dynamic array
+}
+```
+
+You can confirm that when you use this fixed code that you do in fact get the
+correct result no matter the number of threads used.
