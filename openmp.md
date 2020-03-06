@@ -436,3 +436,93 @@ delete[] a;                 // Clean up dynamic array
 
 You can confirm that when you use this fixed code that you do in fact get the
 correct result no matter the number of threads used.
+
+## Data Scoping
+
+To prevent race conditions `omp` allows us to specify `private` memory to each
+thread.
+
+By default `omp` assumes all variables are `shared`, because shared variables
+cut down on wasted memory. Note that you can change the default from `shared` to
+`private` by using the `default` clause, however this is fairly uncommon and
+recommended. What is more common and shown in many of the examples below is to
+use the `default(none)` syntax. Using this clause forces the programmer (on
+penealty of a compile-time error) to decide all whether a variable is `shared`
+or `private`.
+
+Importantly, there are two exeptions to the `default` of `shared`. The first
+is the first loop index of a `parallel for` `worksharing` region. There are few
+(if any) compelling reasons that this variable should ever be public, so its
+a convenience for `omp` to make this variable private. The second, is any
+stack variable declared inside of a parallel region.
+
+Below is an example illustrating the use of `shared` and `private`.
+
+> private.cpp
+
+```cpp
+#include "omp.h"
+#include "iostream"
+#include "thread"
+#include "chrono"
+
+void slow_func(){                           // Define a slow function.
+  std::chrono::milliseconds timespan(5);
+  std::this_thread::sleep_for(timespan);
+}
+
+int main(){
+
+const int n = 10;                           // Declare arrays
+int *evens = new int [n];
+int *odds = new int [n];
+
+int even;                                   // Declare even and odd
+int odd;
+
+#pragma omp parallel default(none) private(even, odd) shared(evens, odds)
+{
+#pragma omp for
+for (int i=0; i<n; i++){  
+  even = 2*i+2;                             // ith even number to even
+  slow_func();                              // Seperate threads using slow_func
+  odd =  even-1;                            // ith odd number to odd
+  evens[i] = even;                          // Assign even and odd
+  odds[i] = odd;
+}
+}
+
+for (int i=0; i<n; i++){                    // Print evens
+  std::cout<<evens[i]<<",";
+}
+std::cout<<std::endl;
+for (int i=0; i<n; i++){                    // Print odds
+  std::cout<<odds[i]<<",";
+}
+std::cout<<std::endl;
+
+delete[]evens;                              // Clean up the arrays
+delete[]odds;
+}
+```
+
+If we did __not__ make `even` and `odd` private (and we using multiple threads),
+we would get undefined results. A possible __wrong__ result for example could
+be.
+
+>./a.out
+
+```bash
+17,7,17,7,17,17,17,7,17,7,
+18,8,18,8,18,18,18,8,18,8,
+```
+
+Where with the race conditions resolved we see that the __correct__ answer is.
+
+>./a.out
+
+```bash
+1,3,5,7,9,11,13,15,17,19,
+2,4,6,8,10,12,14,16,18,20,
+```
+
