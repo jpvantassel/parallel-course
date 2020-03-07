@@ -610,32 +610,31 @@ Now lets examine an example for the use of `lastprivate()`.
 
 int main(){
 
-const int n=20;                            // Define triangular matrix nxn
-int** tri_mat = new int*[n];
-for (int i=0; i<n; i++){
-  tri_mat[i] = new int[i+1];
-}
-
-int rcount = 0;                            // Define counter variable
-#pragma omp parallel default(none) shared(rcount, tri_mat)
-                                           // Make counter variable shared
+const int n=12;                              // Define iterations
+int var = 10;                                // Define variable
+#pragma omp parallel default(none) shared(var, std::cout)
 {
-#pragma omp for schedule(dynamic) private(rcount)
-                                           // Counter variable here is WRONG!
-for (int i=0; i<n; i++){
-  rcount = 0;                              // Rest counter on each row
-  for (int j=0; j<i+1; j++){
-    tri_mat[i][j] = 0;  
-    rcount += 1;                           // Count elements in row
-  }
-}                                          // End parallel for (rcount back to 0)
-}                                          // End parallel region
-std::cout<<"rcount = "<<rcount<<std::endl; // Return counter
 
-for (int i=0; i<n; i++){                   // Clean-up the triangular array
-  delete[]tri_mat[i];
-}
-delete[]tri_mat;
+#pragma omp single
+std::cout<<"Parallel Region: var = "<<var<<std::endl;
+
+#pragma omp for schedule(dynamic, 1) private(var)
+                                            // Should be firstprivate(var)!
+for (int i=0; i<n; i++){
+  for (int j=0; j<i+1; j++){
+    var = 20;                               // Set var to 20
+    if (i == n-1 && j==i)                   // If last iteration
+      std::cout<<"This";
+      var = 30;                             // Set var to 30
+  }
+}                                           // End parallel for
+
+#pragma omp single
+std::cout<<"Parallel Region: var = "<<var<<std::endl;
+
+}                                          // End parallel region
+
+std::cout<<"Serial Region: var = "<<var<<std::endl;
 }
 ```
 
@@ -644,16 +643,22 @@ This code is incorrect and will return the following.
 > ./a.out
 
 ```bash
-rcount = 0
+Parallel Region: var = 10
+Parallel Region: var = 10
+Serial Region: var = 10
 ```
 
-To fix it, we change `private(rcount)` to `lastprivate(rcount)` so that the last
-value of the loop iteration (which should always be equal to `n`) is returned
+To fix it, we change `private(var)` to `lastprivate(var)` so that the last
+value of the loop iteration (which should always be equal to 30) is returned
 to the master thread (i.e., thread 0). That way once the `parallel region` ends
-we have the correct value of `rcount` to print.
+we have the correct value of `var` to print.
 
-``` ./a.out
+> ./a.out
 
 ```bash
-rcount = 20
+Parallel Region: var = 10
+Parallel Region: var = 30
+Serial Region: var = 30
 ```
+
+### Reduction
