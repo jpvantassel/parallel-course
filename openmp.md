@@ -146,6 +146,72 @@ Parallel Code
 Serial Code After
 ```
 
+## Api Basics
+
+The `omp` API (Application Programming Interface) includes a number of helpful
+built in functions. You have seen a few of these previously for example
+`omp_get_thread_num()` in the above `helloworld.cpp` example. A thourough
+introduction to the basic api calls are presented here. It is important to spend
+a some time to understand how these calls behave when inside and outside the
+`parallel region` (as we will show these may be different) in order to
+understand the remaining examples in this module.
+
+The below example includes the basic api calls with their reults shown below.
+
+> mpiapi.cpp
+
+```cpp
+#include <iostream>
+#include "omp.h"
+
+int main(){
+
+std::cout<<"Serial Region"<<std::endl;
+
+std::cout<<"  omp_get_thread_num()  "<<omp_get_thread_num()<<std::endl;
+std::cout<<"  omp_get_num_procs()   "<<omp_get_num_procs()<<std::endl;
+std::cout<<"  omp_get_num_threads() "<<omp_get_num_threads()<<std::endl;
+
+std::cout<<std::endl<<"Parallel Region"<<std::endl;
+#pragma omp parallel
+{
+
+#pragma omp critical
+{
+std::cout<<"  omp_get_thread_num()  "<<omp_get_thread_num()<<std::endl;
+std::cout<<"  omp_get_num_procs()   "<<omp_get_num_procs()<<std::endl;
+std::cout<<"  omp_get_num_threads() "<<omp_get_num_threads()<<std::endl;
+}
+}
+
+
+}
+```
+
+>./a.out
+
+```bash
+Serial Region
+  omp_get_thread_num()  0        # On master thread (i.e., thread 0).
+  omp_get_num_procs()   8        # Machine has 8 processers.
+  omp_get_num_threads() 1        # Only have 1 thread b/c in serial region.
+
+Parallel Region
+  omp_get_thread_num()  2        # Thread 2
+  omp_get_num_procs()   8        # Machine processors does not change!
+  omp_get_num_threads() 4        # Four threads b/c in parallel region
+  omp_get_thread_num()  0        # Now thread 0.
+  omp_get_num_procs()   8        # Same as previous.
+  omp_get_num_threads() 4        # Same as previous.
+  omp_get_thread_num()  3
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+  omp_get_thread_num()  1
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+```
+
+
 ## Work Sharing
 
 After the `fork` and `join` model the next most significant concept to
