@@ -267,6 +267,8 @@ and see the performance of each of the three types of scheduling.
 
 > schedule.cpp
 
+TODO (jpv): Check matrix here.
+
 ```cpp
 #include "omp.h"
 #include "iostream"
@@ -439,6 +441,8 @@ correct result no matter the number of threads used.
 
 ## Data Scoping
 
+### Shared and Private
+
 To prevent race conditions `omp` allows us to specify `private` memory to each
 thread.
 
@@ -526,3 +530,130 @@ Where with the race conditions resolved we see that the __correct__ answer is.
 2,4,6,8,10,12,14,16,18,20,
 ```
 
+### First Private and Last Private
+
+In the previous section, `private` was presented as a way to resolve race
+conditions (i.e., inconsistnet state amoungst threads). However, a side effect
+of using a `private` variable is that the value of the variable is not
+instantiated for each thread by default. And furthermore the value at the end
+of `parallel for` is not returned to the master thread.
+
+To overcome there two spefic problems, `omp` provides `firstprivate()` and
+`lastprivate()`. Variables who are `firstprivate()` are initialized with the
+value defined outside the `parallel region`. Varaibles who are `lastprivate()`
+have the value at the end of the last iteration of the `parallel for` returned
+to the master thread for use in subsequent serial or parallel regions.
+
+Below is an example where the code, as written, does not have a `race condition`
+but it also does not return the correct results (i.e., the result we would get
+if we ran it serially).
+
+> firstprivate.cpp
+
+```cpp
+#include "iostream"
+#include "omp.h"
+
+int main(){
+
+const int n = 80;                             // Make psum=10 (b/c 8 threads)
+int psum=5;                                   // Add initial value so psum=15
+
+#pragma omp parallel private(psum)            // Making psum private is a MISTAKE!
+{
+
+#pragma omp for
+for (int i=0; i<n; i++){
+  psum += 1;                                  // Count to n using seperate threads
+}
+
+#pragma omp for
+for (int i=0; i<omp_get_num_threads(); i++){
+
+#pragma omp critical                          // Use critical to avoid race condition
+std::cout<<psum<<", ";                        // Print partial sums from each thread
+
+}
+
+}
+
+}
+```
+
+The result of running this program is shown below. We see that the sum of all
+of the partial sums (`psum`) are 80, however that is not what we expected, as
+`psum` was initialized to `5`. The issue here is since `psum` is private
+it does not get initialized in the `parallel region`.
+
+> ./a.out
+
+```bash
+10, 10, 10, 10, 10, 10, 10, 10,
+```
+
+To get the expected result we need to replace `private(psum)` in the above
+code to `firstprivate(psum)` then we will get the expected result.
+
+> ./a.out
+
+```bash
+15, 15, 15, 15, 15, 15, 15, 15,
+```
+
+Now lets examine an example for the use of `lastprivate()`.
+
+> lastprivate.cpp
+
+```cpp
+#include "omp.h"
+#include "iostream"
+
+int main(){
+
+const int n=20;                            // Define triangular matrix nxn
+int** tri_mat = new int*[n];
+for (int i=0; i<n; i++){
+  tri_mat[i] = new int[i+1];
+}
+
+int rcount = 0;                            // Define counter variable
+#pragma omp parallel default(none) shared(rcount, tri_mat)
+                                           // Make counter variable shared
+{
+#pragma omp for schedule(dynamic) private(rcount)
+                                           // Counter variable here is WRONG!
+for (int i=0; i<n; i++){
+  rcount = 0;                              // Rest counter on each row
+  for (int j=0; j<i+1; j++){
+    tri_mat[i][j] = 0;  
+    rcount += 1;                           // Count elements in row
+  }
+}                                          // End parallel for (rcount back to 0)
+}                                          // End parallel region
+std::cout<<"rcount = "<<rcount<<std::endl; // Return counter
+
+for (int i=0; i<n; i++){                   // Clean-up the triangular array
+  delete[]tri_mat[i];
+}
+delete[]tri_mat;
+}
+```
+
+This code is incorrect and will return the following.
+
+> ./a.out
+
+```bash
+rcount = 0
+```
+
+To fix it, we change `private(rcount)` to `lastprivate(rcount)` so that the last
+value of the loop iteration (which should always be equal to `n`) is returned
+to the master thread (i.e., thread 0). That way once the `parallel region` ends
+we have the correct value of `rcount` to print.
+
+``` ./a.out
+
+```bash
+rcount = 20
+```
