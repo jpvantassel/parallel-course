@@ -610,55 +610,73 @@ Now lets examine an example for the use of `lastprivate()`.
 
 int main(){
 
-const int n=12;                              // Define iterations
-int var = 10;                                // Define variable
+const int n=10;                             // Define iterations
+int var=24;                                 // Define variable
+
+std::cout<<"Serial Region - Variable var="<<var<<std::endl;
+
 #pragma omp parallel default(none) shared(var, std::cout)
 {
 
 #pragma omp single
-std::cout<<"Parallel Region: var = "<<var<<std::endl;
+std::cout<<"Parallel Region - Variable var="<<var<<std::endl;
 
-#pragma omp for schedule(dynamic, 1) private(var)
-                                            // Should be firstprivate(var)!
+#pragma omp for schedule(dynamic, 3) private(var)
 for (int i=0; i<n; i++){
-  for (int j=0; j<i+1; j++){
-    var = 20;                               // Set var to 20
-    if (i == n-1 && j==i)                   // If last iteration
-      std::cout<<"This";
-      var = 30;                             // Set var to 30
+  var = i;
+  #pragma omp critical
+  {
+  std::cout<<"Thread Number: "<<omp_get_thread_num()<<"\t"
+           <<"Variable var="<<var<<std::endl;
   }
 }                                           // End parallel for
 
 #pragma omp single
-std::cout<<"Parallel Region: var = "<<var<<std::endl;
+std::cout<<"Parallel Region - Variable var="<<var<<std::endl;
 
-}                                          // End parallel region
+}                                           // End parallel region
 
-std::cout<<"Serial Region: var = "<<var<<std::endl;
+std::cout<<"Serial Region - Variable var = "<<var<<std::endl;
+
 }
 ```
 
-This code is incorrect and will return the following.
+When `export OMP_NUM_THREADS=4` this returned.
 
 > ./a.out
 
 ```bash
-Parallel Region: var = 10
-Parallel Region: var = 10
-Serial Region: var = 10
+Serial Region - Variable var=24
+Parallel Region - Variable var=24
+Thread Number: 1 - Variable var=0
+Thread Number: 1 - Variable var=1
+Thread Number: 1 - Variable var=2
+Thread Number: 2 - Variable var=3
+Thread Number: 2 - Variable var=4
+Parallel Region - Variable var=24
+Serial Region - Variable var = 24
 ```
 
-To fix it, we change `private(var)` to `lastprivate(var)` so that the last
-value of the loop iteration (which should always be equal to 30) is returned
-to the master thread (i.e., thread 0). That way once the `parallel region` ends
-we have the correct value of `var` to print.
+We observe that by making `var` private within the for loop preventing the
+result from being returned into the parallel region's scope.
+
+Now if we change `private(var)` to `lastprivate(var)`, we see the following.
 
 > ./a.out
 
 ```bash
-Parallel Region: var = 10
-Parallel Region: var = 30
-Serial Region: var = 30
+Serial Region - Variable var=24
+Parallel Region - Variable var=24
+Thread Number: 2 - Variable var=0
+Thread Number: 2 - Variable var=1
+Thread Number: 2 - Variable var=2
+Thread Number: 1 - Variable var=3
+Thread Number: 1 - Variable var=4
+Parallel Region - Variable var=4
+Serial Region - Variable var = 4
 ```
+
+In this case we do see that `var` is returned out of the `parallel for` scope
+and back into the `parallel region`.
 
 ### Reduction

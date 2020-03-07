@@ -3,28 +3,32 @@
 
 int main(){
 
-const int n=12;                             // Define iterations
-int var = 10;                               // Define variable
+const int n=5;                              // Define iterations
+int var=24;                                 // Define variable
+
+std::cout<<"Serial Region - Variable var="<<var<<std::endl;
+
 #pragma omp parallel default(none) shared(var, std::cout)
 {
 
 #pragma omp single
-std::cout<<"Parallel Region: var = "<<var<<std::endl;
+std::cout<<"Parallel Region - Variable var="<<var<<std::endl;
 
-#pragma omp for schedule(dynamic, 1) private(var)
-                                            // Should be lastprivate(var)!
+#pragma omp for schedule(dynamic, 3) lastprivate(var)
 for (int i=0; i<n; i++){
-  for (int j=0; j<i+1; j++){
-    var = 20;                               // Set var to 20
-    if (i == n-1 && j==i)                   // If last iteration
-      var = 30;                             // Set var to 30
+  var = i;
+  #pragma omp critical
+  {
+  std::cout<<"Thread Number: "<<omp_get_thread_num()<<" - "
+           <<"Variable var="<<var<<std::endl;
   }
 }                                           // End parallel for
 
 #pragma omp single
-std::cout<<"Parallel Region: var = "<<var<<std::endl;
+std::cout<<"Parallel Region - Variable var="<<var<<std::endl;
 
 }                                           // End parallel region
 
-std::cout<<"Serial Region: var = "<<var<<std::endl;
+std::cout<<"Serial Region - Variable var = "<<var<<std::endl;
+
 }
