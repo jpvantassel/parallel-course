@@ -30,8 +30,8 @@ TODO(jpv): What values does _OPENMP take on.
 - Launch a program in the standard way `./a.out`.
 - However, the program is senstivate to environment variables including:
   - `OMP_NUM_THREADS`: Sets number of threads that may used.
-  - `OMP_SCHEDULE`: Allows for experimenting with parallel scheduling (more on
-  this later).
+  - `OMP_SCHEDULE`: Allows for experimenting with scheduling (more on this
+  later).
 
 ## A Simple OpenMP Program
 
@@ -495,7 +495,8 @@ The `chunk size` in this case is the minimum `chunk size`, if not defined it
 defaults to 1.
 - `schedule(runtime)`: In this case the schedule type is set by the environment
 variable `OMP_SCHEDULE`, which is useful to see what type of scheduling is the
-most performant.
+most performant. For example to set `runtime` to `guided,8` use
+`export OMP_SCHEDULE='guided,8'`.
 
 Lets compare the three different types of scheduling.
 
