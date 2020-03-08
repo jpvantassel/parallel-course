@@ -30,8 +30,8 @@ TODO(jpv): What values does _OPENMP take on.
 - Launch a program in the standard way `./a.out`.
 - However, the program is senstivate to environment variables including:
   - `OMP_NUM_THREADS`: Sets number of threads that may used.
-
-TODO (jpv): Add other relavant environment variables.
+  - `OMP_SCHEDULE`: Allows for experimenting with parallel scheduling (more on
+  this later).
 
 ## A Simple OpenMP Program
 
@@ -477,12 +477,115 @@ it reaches the user-defined minimum. `guided` may in certain cases offer better
 performance than `dynamic`. Set the minimum chunk size such that the
 parallelization is still performant.
 
-Lets consider an example where we want to square a triangular array of values
-and see the performance of each of the three types of scheduling.
+The schedule types listed above each come with a `chunk size` arguement, they
+are detailed as follows.
 
-> schedule.cpp
+- `schedule(static, N)`: Each thread receives N iterations starting from thread
+0 and increasing to N-1 threads. If there is more work it begins again from 0.
+If N is not specified then the work is divided as equally as possible in terms
+of loop iterations (e.g., if there are 100 iterations and 4 threads each thread
+would recieve 25).
+- `schedule(dynamic, N)`: Each thread receives N iterations however the thread
+order is decided at runtime. If N is not specifies a default `chunk size` is
+assumed this may be 1.
+- `scheudle(guided, N)`: `omp` decides how much work should go to each thread.
+As work is assigned, `omp` decides whether to keep the work for the next thread
+the same as the previous or to decrease it (the workload cannot be increased).
+The `chunk size` in this case is the minimum `chunk size`, if not defined it
+defaults to 1.
+- `schedule(runtime)`: In this case the schedule type is set by the environment
+variable `OMP_SCHEDULE`, which is useful to see what type of scheduling is the
+most performant.
 
-TODO (jpv): Check matrix here.
+Lets compare the three different types of scheduling.
+
+> scheduling.cpp
+
+```cpp
+#include <iostream>
+#include <omp.h>
+
+int main(){
+
+#pragma omp parallel
+{
+
+#pragma omp single
+std::cout<<"schedule(static,2)"<<std::endl;
+#pragma omp for schedule(static, 2)
+for (int i=0; i<12; i++){
+  #pragma omp critical
+  std::cout<<"  Thread Number: "<<omp_get_thread_num()<<" i="<<i<<std::endl;
+}
+
+#pragma omp single
+std::cout<<"schedule(dynamic,2)"<<std::endl;
+#pragma omp for schedule(dynamic, 2)
+for (int i=0; i<12; i++){
+  #pragma omp critical
+  std::cout<<"  Thread Number: "<<omp_get_thread_num()<<" i="<<i<<std::endl;
+}
+
+#pragma omp single
+std::cout<<"schedule(guided, 2)"<<std::endl;
+#pragma omp for schedule(guided, 2)
+for (int i=0; i<12; i++){
+  #pragma omp critical
+  std::cout<<"  Thread Number: "<<omp_get_thread_num()<<" i="<<i<<std::endl;
+}
+
+}
+}
+```
+
+> ./a.out
+
+```bash
+schedule(static,2)
+  Thread Number: 0 i=0
+  Thread Number: 0 i=1
+  Thread Number: 0 i=8
+  Thread Number: 0 i=9
+  Thread Number: 3 i=6
+  Thread Number: 3 i=7
+  Thread Number: 1 i=2
+  Thread Number: 1 i=3
+  Thread Number: 2 i=4
+  Thread Number: 2 i=5
+  Thread Number: 1 i=10
+  Thread Number: 1 i=11
+schedule(dynamic,2)
+  Thread Number: 0 i=0
+  Thread Number: 0 i=1
+  Thread Number: 1 i=2
+  Thread Number: 1 i=3
+  Thread Number: 3 i=6
+  Thread Number: 3 i=7
+  Thread Number: 1 i=10
+  Thread Number: 1 i=11
+  Thread Number: 0 i=8
+  Thread Number: 0 i=9
+  Thread Number: 2 i=4
+  Thread Number: 2 i=5
+schedule(guided, 2)
+  Thread Number: 1 i=0
+  Thread Number: 1 i=1
+  Thread Number: 1 i=2
+  Thread Number: 3 i=8
+  Thread Number: 3 i=9
+  Thread Number: 1 i=10
+  Thread Number: 1 i=11
+  Thread Number: 2 i=3
+  Thread Number: 2 i=4
+  Thread Number: 2 i=5
+  Thread Number: 0 i=6
+  Thread Number: 0 i=7
+```
+
+Now lets compare performance between the three schedule types, when we want to
+initialize a triangular matrix (i.e., an unbalanced load condition).
+
+> compareschedule.cpp
 
 ```cpp
 #include "omp.h"
@@ -491,21 +594,18 @@ TODO (jpv): Check matrix here.
 
 int main(){
 
-const int nrows=10000;                  // Define triangular array 10000 x 10000.
-int **rows = new int*[nrows];
-int **tmps = new int*[nrows];
-
-for (int i=0; i<nrows; ++i){            // Setup the triangular nature.
-  rows[i] = new int [i];
-  tmps[i] = new int [i];
+const int n=10000;                  // Define triangular array 10000 x 10000.
+int **array = new int*[n];
+for (int i=0; i<n; i++){            // Setup the triangular nature.
+  array[i] = new int [i+1];
 }
 
 // Static
 auto start_static = std::chrono::high_resolution_clock::now();
 #pragma omp parallel for schedule(static)
-for (int i=0; i<nrows; ++i){
-  for (int j=0; j<i; ++j){
-    tmps[i][j] = rows[i][j]*rows[i][j];
+for (int i=0; i<n; ++i){
+  for (int j=0; j<i+1; j++){
+    array[i][j] = 0;
   }
 }
 auto end_static = std::chrono::high_resolution_clock::now();
@@ -516,9 +616,9 @@ std::cout<<"Elapsed Time Static "<<elapsed_time_static<<" sec."<<std::endl;
 // Dynamic
 auto start_dynamic = std::chrono::high_resolution_clock::now();
 #pragma omp parallel for schedule(dynamic)
-for (int i=0; i<nrows; ++i){
-  for (int j=0; j<i; ++j){
-    tmps[i][j] = rows[i][j]*rows[i][j];
+for (int i=0; i<n; ++i){
+  for (int j=0; j<i+1; j++){
+    array[i][j] = 1;
   }
 }
 auto end_dynamic = std::chrono::high_resolution_clock::now();
@@ -529,9 +629,9 @@ std::cout<<"Elapsed Time Dynamic "<<elapsed_time_dynamic<<" sec."<<std::endl;
 // Guided
 auto start_guided = std::chrono::high_resolution_clock::now();
 #pragma omp parallel for schedule(guided, 1)
-for (int i=0; i<nrows; ++i){
-  for (int j=0; j<i; ++j){
-    tmps[i][j] = rows[i][j]*rows[i][j];
+for (int i=0; i<n; ++i){
+  for (int j=0; j<i+1; j++){
+    array[i][j] = 2;
   }
 }
 auto end_guided = std::chrono::high_resolution_clock::now();
@@ -539,12 +639,10 @@ double elapsed_time_guided = std::chrono::duration_cast<std::chrono::nanoseconds
 elapsed_time_guided *= 1e-9;
 std::cout<<"Elapsed Time Guided "<<elapsed_time_guided<<" sec."<<std::endl;
 
-for (int i=0; i<nrows; ++i){            // Deallocate memory.
-  delete[]tmps[i];
-  delete[]rows[i];
+for (int i=0; i<n; ++i){
+  delete[]array[i];
 }
-delete[]tmps;
-delete[]rows;
+delete[]array;
 }
 ```
 
