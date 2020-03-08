@@ -168,6 +168,8 @@ int main(){
 
 std::cout<<"Serial Region"<<std::endl;
 
+std::cout<<"  omp_in_parallel()     "<<omp_in_parallel()<<std::endl;
+std::cout<<"  omp_get_max_threads() "<<omp_get_max_threads()<<std::endl;
 std::cout<<"  omp_get_thread_num()  "<<omp_get_thread_num()<<std::endl;
 std::cout<<"  omp_get_num_procs()   "<<omp_get_num_procs()<<std::endl;
 std::cout<<"  omp_get_num_threads() "<<omp_get_num_threads()<<std::endl;
@@ -178,12 +180,31 @@ std::cout<<std::endl<<"Parallel Region"<<std::endl;
 
 #pragma omp critical
 {
+std::cout<<"  omp_in_parallel()     "<<omp_in_parallel()<<std::endl;
+std::cout<<"  omp_get_max_threads() "<<omp_get_max_threads()<<std::endl;
 std::cout<<"  omp_get_thread_num()  "<<omp_get_thread_num()<<std::endl;
 std::cout<<"  omp_get_num_procs()   "<<omp_get_num_procs()<<std::endl;
 std::cout<<"  omp_get_num_threads() "<<omp_get_num_threads()<<std::endl;
-}
+std::cout<<std::endl;
 }
 
+#pragma omp single
+std::cout<<"Worksharing Region"<<std::endl;
+
+#pragma omp for
+for (int i=0; i<4; i++){
+  #pragma omp critical
+  {
+  std::cout<<"  omp_in_parallel()     "<<omp_in_parallel()<<std::endl;
+  std::cout<<"  omp_get_max_threads() "<<omp_get_max_threads()<<std::endl;
+  std::cout<<"  omp_get_thread_num()  "<<omp_get_thread_num()<<std::endl;
+  std::cout<<"  omp_get_num_procs()   "<<omp_get_num_procs()<<std::endl;
+  std::cout<<"  omp_get_num_threads() "<<omp_get_num_threads()<<std::endl;
+  std::cout<<std::endl;
+  }
+}
+  
+}
 
 }
 ```
@@ -192,24 +213,153 @@ std::cout<<"  omp_get_num_threads() "<<omp_get_num_threads()<<std::endl;
 
 ```bash
 Serial Region
-  omp_get_thread_num()  0        # On master thread (i.e., thread 0).
-  omp_get_num_procs()   8        # Machine has 8 processers.
-  omp_get_num_threads() 1        # Only have 1 thread b/c in serial region.
+  omp_in_parallel()     0
+  omp_get_max_threads() 4
+  omp_get_thread_num()  0
+  omp_get_num_procs()   8
+  omp_get_num_threads() 1
 
 Parallel Region
-  omp_get_thread_num()  2        # Thread 2
-  omp_get_num_procs()   8        # Machine processors does not change!
-  omp_get_num_threads() 4        # Four threads b/c in parallel region
-  omp_get_thread_num()  0        # Now thread 0.
-  omp_get_num_procs()   8        # Same as previous.
-  omp_get_num_threads() 4        # Same as previous.
-  omp_get_thread_num()  3
-  omp_get_num_procs()   8
-  omp_get_num_threads() 4
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
   omp_get_thread_num()  1
   omp_get_num_procs()   8
   omp_get_num_threads() 4
+
+Worksharing Region
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
+  omp_get_thread_num()  0
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
+  omp_get_thread_num()  2
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
+  omp_get_thread_num()  3
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
+  omp_get_thread_num()  2
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
+  omp_get_thread_num()  1
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
+  omp_get_thread_num()  3
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
+
+  omp_in_parallel()     1
+  omp_get_max_threads() 4
+  omp_get_thread_num()  0
+  omp_get_num_procs()   8
+  omp_get_num_threads() 4
 ```
+
+And another example that examines the difference between
+`omp_get_max_threads()` and `omp_get_num_threads()`.
+
+>numthreads.cpp
+
+```cpp
+#include <iostream>
+#include "omp.h"
+
+int main(){
+
+std::cout<<"Serial Region:"<<std::endl;
+std::cout<<"  omp_get_max_threads()  "<<omp_get_max_threads()<<std::endl;
+std::cout<<"  omp_get_num_threads()  "<<omp_get_num_threads()<<std::endl;
+std::cout<<std::endl;
+
+omp_set_num_threads(8);
+std::cout<<"omp_set_num_threads(8)"<<std::endl;
+std::cout<<std::endl;
+
+std::cout<<"  Serial Region:"<<std::endl;
+std::cout<<"    omp_get_max_threads()  "<<omp_get_max_threads()<<std::endl;
+std::cout<<"    omp_get_num_threads()  "<<omp_get_num_threads()<<std::endl;
+std::cout<<std::endl;
+
+#pragma omp parallel
+{
+#pragma omp single
+{
+std::cout<<"  Parallel Region:"<<std::endl;
+std::cout<<"    omp_get_max_threads()  "<<omp_get_max_threads()<<std::endl;
+std::cout<<"    omp_get_num_threads()  "<<omp_get_num_threads()<<std::endl;
+std::cout<<std::endl;
+
+omp_set_num_threads(6);
+std::cout<<"omp_set_num_threads(6)"<<std::endl;
+std::cout<<std::endl;
+
+std::cout<<"  Parallel Region:"<<std::endl;
+std::cout<<"    omp_get_max_threads()  "<<omp_get_max_threads()<<std::endl;
+std::cout<<"    omp_get_num_threads()  "<<omp_get_num_threads()<<std::endl;
+}
+}
+
+}
+```
+
+>>./a.out
+
+```bash
+Serial Region:
+  omp_get_max_threads()  4
+  omp_get_num_threads()  1
+
+omp_set_num_threads(8)
+
+  Serial Region:
+    omp_get_max_threads()  8
+    omp_get_num_threads()  1
+
+  Parallel Region:
+    omp_get_max_threads()  8
+    omp_get_num_threads()  8
+
+omp_set_num_threads(6)
+
+  Parallel Region:
+    omp_get_max_threads()  6
+    omp_get_num_threads()  8
+```
+
+In summary
+
+- `omp_in_parallel()`: 0 if in serial region, 1 otherwise (parallel region and
+worksharing).
+- `omp_get_num_procs()`: Always the number of processors (i.e., maximum number
+of hardware threads).
+- `omp_get_num_threads()`: Number of currenlty spawned threads, 1 if in serial
+region.
+- `omp_get_thread_num()`: 0 if in serial region, 0 to N-1 otherwise. Where N is
+the number of avaiable threads (i.e., equal to `omp_get_num_threads`).
+- `omp_get_max_threads()`: Depends on the following listed in order of highest
+to lowest precidence `omp_set_num_threads(#)`>`OMP_NUM_THREADS`>
+`omp_get_num_procs()`.
+  - The default is the number of hardware threads available (i.e., equal to
+  `omp_get_num_procs()`).
+  - If the environment variable `OMP_NUM_THREADS` has been set then it is replace
+  with that value.
+  - If the `omp_set_num_threads(#)` api call has been made then it returns `#`,
+  ignoring the value from `OMP_NUM_THREADS` if it has been set.
 
 ## Work Sharing
 
@@ -800,5 +950,20 @@ Serial Region - sum=36
 We see that the initial value of `sum` is correctly equal to 1, the partial sums
 in the `parallel region` correctly equal 35 (i.e., the sum of `array`), and that
 the final value of `sum` is equal to 36 (the intial value 1 + the sum of `array`
-which was equal to 35).s
+which was equal to 35).
 
+## Synchronization
+
+Thats
+
+### Critical
+
+This
+
+### Atomic
+
+This
+
+### Master
+
+This
