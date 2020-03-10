@@ -1094,17 +1094,23 @@ info is returned.
 
 ## Orphaned Worksharing
 
-`omp` allows the definition of `parallel region` to be seperated from the
+`omp` allows the definition of a `parallel region` to be seperated from the
 corresponding `worksharing construct`. This allows the programmer to build
 general functions/classes that can be executed in serial or parallel.
 
-To illustrate a simple table is shown below to illustrate the interactions
+To illustrate, a simple table is shown below to illustrate the interactions
 between the `parallel region` and `worksharing construct`.
 
-|                   | Parallel - Yes    | Parallel - No         |
-|:-----------------:|:-----------------:|:---------------------:|
-| Worksharing - Yes | Parallel          | Orphaned Worksharing  |
-| Worksharing - No  | Replicated Work   | Serial                |
+|                   | Parallel - Yes    | Parallel - No          |
+|:-----------------:|:-----------------:|:----------------------:|
+| Worksharing - Yes | Parallel          | Pragma ignored, Serial |
+| Worksharing - No  | Replicated Work   | Serial                 |
+
+Any `worksharing construct` defined outside of a `parallel regions` lexical
+scope (i.e., `{}` in C/C++) is called `orphaned worksharing`. This could be
+inside of a function that can be called inside or outside the parallel region.
+If the function is called in a `serial region` then the pragma is ingored the
+code is executed serially, otherwise the code is executed in parallel.
 
 ## Tasking
 
