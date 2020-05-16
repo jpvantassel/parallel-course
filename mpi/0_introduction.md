@@ -63,7 +63,7 @@ done with the following:
 mpic++ hello.cpp
 ```
 
-This will result in our executable `a.out`.
+This will result in an executable `a.out`.
 
 ## Running the Program
 
@@ -90,5 +90,5 @@ Hello from process rank 3 of 4
 ```
 
 The result shows that our program launched successfully with the number of
-processors (`-np`) equal to 4. We have successfully written, compiled, and run
-our first program using `MPI`.
+processors (`-np`) equal to 4. And so we have successfully written, compiled,
+and run our first program using `MPI`.

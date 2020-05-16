@@ -1,4 +1,4 @@
-# Syncrhonous Commucication
+# Synchronous Communication
 
 > Joseph P. Vantassel, The University of Texas at Austin
 
