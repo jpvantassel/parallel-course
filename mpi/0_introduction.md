@@ -50,7 +50,7 @@ work to be done by all processes. We use this region to allocated three
 integers, it concludes with the call to `MPI_Init()`.
 - __Application__: Contains the time-consuming functions of the program that
 are to be performed in parallel, it ends just before `MPI_Finalize`.
-- __TearDown__: Begins with `MPI_Finalize` and concluded as the end of main. It
+- __TearDown__: Begins with `MPI_Finalize` and concludes at the end of main. It
 contains any final actions that need to be performed. This region will typically
 be empty.
 

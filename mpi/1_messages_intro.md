@@ -21,7 +21,7 @@ of the programmer.
 channels are called communicators. Think of a communicator as a channel on a
 radio. Both the sender and the receiver need to be tuned to that same channel in
 order to pass information. You have already seen the default
-communicator, `MPI_COMM_WORLD`, in our `hello.cpp` example. `MPI_COMM_WORLD` by
+communicator, `MPI_COMM_WORLD`, in our `hello.cpp` example. `MPI_COMM_WORLD`
 includes all ranks (i.e., processes), however the programmer is free
 to make subsets of `MPI_COMM_WORLD`.
 
@@ -37,6 +37,8 @@ integer to the number of ranks in the communicator, and returns an error code.
 - `int ierr = MPI_Comm_rank(<comm MyComm>, <int *rank>)`: Similar to the
 previous except it sets the value of the integer to the processor's rank.
 
+<!-- TODO (jpv): How do you create a second communicator. -->
+
 ## Messaging Modes
 
 Data must exist either on the sending processes memory or the receiving
@@ -46,21 +48,23 @@ receiver to be prepared to communicate at the same time and if they are not,
 the process ready first must wait for the other. This type of communication
 is referred to as `synchronous`, as both processes must be synchronized before
 they can proceed. However, `MPI` provides us an alternative called
-`asynchronous` communication, which does not require the two processes to be
-ready at the same time. We introduce both methods of communication below.
+`asynchronous` communication, which is able to circumvent this short-fall and
+does not require the two processes to be ready at the same time. We introduce
+both methods of communication in a more formal manner below.
 
 ### Synchronous Communication
 
-Here is a list of `synchronous` sends:
+Here is a list of the four types of `synchronous` sends:
 
-- Synchronous Send (MPI_Ssend) - Complete only after the last packet of data
+- Synchronous Send (`MPI_Ssend`) - Complete only after the last packet of data
 has been sent.
-- Buffered Send (MPI_Bsend) - Complete when data has been transferred to a
+- Buffered Send (`MPI_Bsend`) - Complete when data has been transferred to the
 buffer.
-- Standard Send (MPI_Send) - Either synchronous or buffered.
-- Ready Send (MPI_Rsend) - Complete after receive has been confirmed.
-
-<!-- See Day3 slide 8. What is a ready send? -->
+- Standard Send (`MPI_Send`) - Either synchronous or buffered, the MPI program
+will decide based on the messages size.
+- Ready Send (`MPI_Rsend`) - Requires the recipient to have issued the receive
+routine before the send. The receiver is already known "ready" to be ready to
+receive.
 
 _Note there is only a single function for receiving messages, and it accepts all
 of the four send types._
